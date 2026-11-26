@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>趋势动物 · 纪律执行看板</title>
+  <title>趋势动物 · 个人交易纪律看板</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <style>
     body {
@@ -19,70 +19,105 @@
 <body class="min-h-screen antialiased">
   <div id="toast" class="fixed top-4 right-4 z-50 hidden max-w-sm rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg"></div>
 
+  <!-- Unsynced Warning Banner -->
+  <div id="unsynced-banner" class="hidden border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-xs font-medium text-amber-900">
+    <span id="unsynced-msg">你有改动暂存在本机浏览器，尚未同步到云端。</span>
+    <button type="button" id="btn-retry-sync" class="ml-2 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700">立即同步云端</button>
+  </div>
+
   <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-    <!-- Top Header & GitHub Private Repo Sync Bar -->
+    <!-- Top Header & Market Weather -->
     <header class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">趋势动物 · 纪律执行看板</h1>
-            <span id="discipline-version-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">v1.0</span>
-            <span id="sync-status-badge" class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">未连接私有仓库</span>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">趋势动物 · 交易纪律看板</h1>
+            <span id="sync-status-badge" class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">未连接云端</span>
+            <span id="autosave-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">自动保存就绪</span>
           </div>
           <p class="mt-1.5 text-sm text-slate-500">
-            数据日期：<span id="meta-date" class="font-semibold text-slate-800">待同步</span>
+            最新数据日期：<span id="meta-date" class="font-semibold text-slate-800">待同步</span>
             <span class="mx-2 text-slate-300">|</span>
-            当日 API 实扣：<span id="meta-cost" class="font-semibold text-slate-800">-</span>
-            <span class="mx-2 text-slate-300">|</span>
-            隐私模式：<span class="font-semibold text-slate-700">公开空壳界面 · 数据存私有仓库</span>
+            提醒模式：<span class="font-semibold text-slate-700">只做提醒，不自动下单</span>
           </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" id="btn-open-connect" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">连接 / 切换私有仓库</button>
-          <button type="button" id="btn-pull-gh" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">拉取最新数据</button>
-          <button type="button" id="btn-push-pos" class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">保存持仓到 GitHub</button>
-          <button type="button" id="btn-export-pos" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">导出 JSON</button>
+          <button type="button" id="btn-open-connect" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">连接我的云端数据</button>
+          <button type="button" id="btn-pull-gh" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">刷新最新行情</button>
+          <button type="button" id="btn-export-pos" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">备份到本地</button>
         </div>
       </div>
 
-      <!-- Three-Market Traffic Lights -->
+      <!-- Three-Market Weather Cards -->
       <div class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3" id="market-gates-grid"></div>
     </header>
 
-    <!-- Zone 1: Priority Today's Action Queue -->
+    <!-- Zone 1: Today's Must-Do Actions -->
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-base font-bold text-slate-900">1. 今日待执行动作（清仓 &gt; 分批减半）</h2>
-          <p class="text-xs text-slate-500">已持仓不受大盘转冷或转沸影响，每日盘后优先核销</p>
+          <h2 class="text-base font-bold text-slate-900">1. 今天必须先处理的操作（先清仓，再卖一半）</h2>
+          <p class="text-xs text-slate-500">已经买在手里的股票，无论大盘冷热，每天收盘后都会自动检查；没卖掉前会一直亮红灯提醒</p>
         </div>
-        <span id="action-count-badge" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">0 项待处理</span>
+        <span id="action-count-badge" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">今天无操作</span>
       </div>
       <div id="action-queue-container" class="mt-4"></div>
     </section>
 
-    <!-- Zone 2: Portfolio & 5% Risk Control -->
+    <!-- Zone 2: Portfolio, 5% Risk Control & Performance Stats -->
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 class="text-base font-bold text-slate-900">2. 持仓与 5% 仓位风控台（positions.json）</h2>
-          <p class="text-xs text-slate-500">总上限 20 只 · 单行业上限 3 只 · 单品种上限 5% · 同一波段每次新信号独立减半</p>
+          <h2 class="text-base font-bold text-slate-900">2. 我的持仓、仓位上限与战绩统计</h2>
+          <p class="text-xs text-slate-500">每次改动会自动保存到你的 GitHub 云端 · 最多买 20 只 · 同行业最多 3 只 · 单只最多买总资金的 5%</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="btn-open-nav-modal" class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">+ 记今日总资金</button>
+          <button type="button" id="btn-open-history-modal" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">交易与净值明细</button>
           <button type="button" id="btn-open-add-modal" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">+ 记一笔买入</button>
         </div>
       </div>
 
+      <!-- Performance KPI Strip (Win Rate, Profit/Loss Ratio, Return, Annualized, Max Drawdown) -->
+      <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" id="perf-kpi-grid">
+        <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+          <div class="text-[11px] font-medium text-slate-500">胜率（赚钱比例）</div>
+          <div id="kpi-winrate" class="mt-1 text-lg font-bold text-slate-900">--</div>
+          <div id="kpi-winrate-sub" class="mt-0.5 text-[11px] text-slate-400">暂无平仓记录</div>
+        </div>
+        <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+          <div class="text-[11px] font-medium text-slate-500">盈亏比（赚vs亏）</div>
+          <div id="kpi-plratio" class="mt-1 text-lg font-bold text-slate-900">--</div>
+          <div id="kpi-plratio-sub" class="mt-0.5 text-[11px] text-slate-400">平均赚 / 平均亏</div>
+        </div>
+        <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+          <div class="text-[11px] font-medium text-slate-500">累计收益率</div>
+          <div id="kpi-totalret" class="mt-1 text-lg font-bold text-slate-900">--</div>
+          <div id="kpi-totalret-sub" class="mt-0.5 text-[11px] text-slate-400">需至少记 2 天总资金</div>
+        </div>
+        <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+          <div class="text-[11px] font-medium text-slate-500">年化收益率</div>
+          <div id="kpi-annret" class="mt-1 text-lg font-bold text-slate-900">--</div>
+          <div id="kpi-annret-sub" class="mt-0.5 text-[11px] text-slate-400">满 7 天后自动计算</div>
+        </div>
+        <div class="col-span-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 sm:col-span-1">
+          <div class="text-[11px] font-medium text-slate-500">最大回撤（最大浮亏）</div>
+          <div id="kpi-maxdd" class="mt-1 text-lg font-bold text-slate-900">--</div>
+          <div id="kpi-maxdd-sub" class="mt-0.5 text-[11px] text-slate-400">历史高点最大跌幅</div>
+        </div>
+      </div>
+
+      <!-- 5% Position Calculator & Limits -->
       <div class="mt-4 grid grid-cols-1 gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 lg:grid-cols-3">
         <div>
-          <label for="total-asset-input" class="block text-xs font-semibold text-slate-600">我的总资产（人民币元，仅存本机浏览器）</label>
+          <label for="total-asset-input" class="block text-xs font-semibold text-slate-600">当前总资金（人民币元）与港币汇率</label>
           <div class="mt-1.5 flex items-center gap-2">
             <input id="total-asset-input" type="number" min="0" step="10000" value="200000" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-900 focus:border-slate-400 focus:outline-none" />
-            <input id="hkd-rate-input" type="number" min="0.1" max="2" step="0.01" value="0.92" title="港币兑人民币参考汇率" class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:border-slate-400 focus:outline-none" />
+            <input id="hkd-rate-input" type="number" min="0.1" max="2" step="0.01" value="0.92" title="1港币约等于多少人民币" class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:border-slate-400 focus:outline-none" />
           </div>
           <p class="mt-1.5 text-xs text-slate-500">
-            单票 5% 上限：<span id="single-cap-cny" class="font-bold text-slate-900">¥10,000</span>
+            单只最多买（5%）：<span id="single-cap-cny" class="font-bold text-slate-900">¥10,000</span>
             <span class="mx-1 text-slate-300">/</span>
             约 <span id="single-cap-hkd" class="font-semibold text-slate-700">HK$10,870</span>
           </p>
@@ -90,14 +125,14 @@
 
         <div class="flex flex-col justify-center">
           <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold text-slate-600">总持股槽位</span>
+            <span class="font-semibold text-slate-600">最多同时买 20 只</span>
             <span id="slots-text" class="font-bold text-slate-900">0 / 20 只</span>
           </div>
           <div class="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
             <div id="slots-bar" class="h-full rounded-full bg-slate-900 transition-all" style="width: 0%"></div>
           </div>
           <div class="mt-3 flex items-center justify-between text-xs">
-            <span class="font-semibold text-slate-600">已用总仓位</span>
+            <span class="font-semibold text-slate-600">已买总仓位</span>
             <span id="weight-text" class="font-bold text-slate-900">0.0% / 100%</span>
           </div>
           <div class="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
@@ -106,7 +141,7 @@
         </div>
 
         <div class="flex flex-col justify-center">
-          <span class="text-xs font-semibold text-slate-600">单行业集中度（上限 3 只 / 行业）</span>
+          <span class="text-xs font-semibold text-slate-600">同行业最多买 3 只</span>
           <div id="industry-cap-tags" class="mt-2 flex flex-wrap gap-1.5 text-xs text-slate-400">暂无持仓</div>
         </div>
       </div>
@@ -114,51 +149,51 @@
       <div id="positions-container" class="mt-4 overflow-x-auto"></div>
     </section>
 
-    <!-- Zone 3: Candidate Pool & Discipline Viewer -->
+    <!-- Zone 3: Candidate Pool & Discipline Rules -->
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-base font-bold text-slate-900">3. 今日备选池与纪律原文</h2>
-          <p class="text-xs text-slate-500">A股：市值 ≥ 50亿 &amp; 月成交 ≥ 10亿人民币 · 港股：市值 ≥ 50亿 &amp; 月成交 ≥ 2亿港元</p>
+          <h2 class="text-base font-bold text-slate-900">3. 今天能买什么（备选清单与我的规则）</h2>
+          <p class="text-xs text-slate-500">已自动排除冷门小票：A股要求市值 ≥ 50亿且月成交 ≥ 10亿；港股要求市值 ≥ 50亿且月成交 ≥ 2亿港元</p>
         </div>
         <div class="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1" id="candidate-tabs">
-          <button type="button" data-tab="aShare" class="tab-btn tab-active rounded-lg px-3 py-1.5 text-xs font-semibold transition">A股</button>
-          <button type="button" data-tab="hkShare" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">港股</button>
+          <button type="button" data-tab="aShare" class="tab-btn tab-active rounded-lg px-3 py-1.5 text-xs font-semibold transition">A股备选</button>
+          <button type="button" data-tab="hkShare" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">港股备选</button>
           <button type="button" data-tab="gold" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">黄金 (518880)</button>
-          <button type="button" data-tab="discipline" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">纪律.md</button>
+          <button type="button" data-tab="discipline" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">我的交易纪律</button>
         </div>
       </div>
       <div id="candidate-panel" class="mt-4"></div>
     </section>
 
     <footer class="pb-6 text-center text-xs text-slate-400">
-      本页面为公开空壳界面，不含任何个人持仓、策略或密钥；所有个人数据仅通过你本机输入的单仓库 Token 从你的私有 GitHub 仓库实时读取 · 趋势指标仅供参考，不构成投资建议。
+      你的持仓、资金与策略都锁在你的 GitHub 私有仓库里，外人打不开也看不到 · 趋势指标仅供参考，不构成投资建议，交易盈亏自负。
     </footer>
   </div>
 
-  <!-- Connect GitHub Private Repo Modal -->
+  <!-- Connect Cloud Modal -->
   <div id="connect-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-slate-900">连接你的 GitHub 私有仓库</h3>
+        <h3 class="text-base font-bold text-slate-900">连接你的 GitHub 私有数据</h3>
         <button type="button" id="btn-close-connect" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
       </div>
-      <p class="mt-1.5 text-xs text-slate-500">令牌仅保存在你当前设备的浏览器本地（不上传到任何第三方服务器），换设备时重新粘贴一次即可。</p>
+      <p class="mt-1.5 text-xs text-slate-500">连接一次后，你每次记买入、卖一半、清仓或记净值，都会自动同步保存到你的私有仓库，不用手动点保存。</p>
       <form id="connect-form" class="mt-4 space-y-3">
         <div>
-          <label for="gh-repo-input" class="block text-xs font-semibold text-slate-600">私有仓库（用户名/仓库名）</label>
+          <label for="gh-repo-input" class="block text-xs font-semibold text-slate-600">你的私有仓库名</label>
           <input id="gh-repo-input" type="text" value="binbin1555/trendtrader-system" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label for="gh-token-input" class="block text-xs font-semibold text-slate-600">单仓库 Fine-grained Token</label>
-          <input id="gh-token-input" type="password" placeholder="github_pat_..." required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          <label for="gh-token-input" class="block text-xs font-semibold text-slate-600">你的 GitHub 专属口令（github_pat_ 开头）</label>
+          <input id="gh-token-input" type="password" placeholder="粘贴你的专属口令" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
         </div>
         <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
           <input id="gh-remember-cb" type="checkbox" checked class="rounded border-slate-300" />
-          在当前设备浏览器中记住（公共电脑请取消勾选）
+          在这台设备上记住（如果是别人的电脑，请取消勾选）
         </label>
         <div class="flex items-center justify-between pt-2">
-          <button type="button" id="btn-forget-token" class="text-xs font-medium text-rose-600 hover:underline">清除本机令牌</button>
+          <button type="button" id="btn-forget-token" class="text-xs font-medium text-rose-600 hover:underline">退出并清除口令</button>
           <div class="flex gap-2">
             <button type="button" id="btn-cancel-connect" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
             <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">连接并同步</button>
@@ -172,7 +207,7 @@
   <div id="add-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-slate-900">记一笔买入持仓</h3>
+        <h3 class="text-base font-bold text-slate-900">记一笔买入</h3>
         <button type="button" id="btn-close-modal" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
       </div>
       <form id="add-pos-form" class="mt-4 space-y-3">
@@ -186,17 +221,17 @@
             </select>
           </div>
           <div>
-            <label for="f-weight" class="block text-xs font-semibold text-slate-600">买入仓位 (%)</label>
-            <input id="f-weight" type="number" step="0.5" min="0.5" max="100" value="5" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <label for="f-weight" class="block text-xs font-semibold text-slate-600">买了多少仓位 (%)</label>
+            <input id="f-weight" type="number" step="0.5" min="0.1" max="100" value="5" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label for="f-name" class="block text-xs font-semibold text-slate-600">标的名称</label>
+            <label for="f-name" class="block text-xs font-semibold text-slate-600">股票/ETF名称</label>
             <input id="f-name" type="text" placeholder="如：交通银行" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label for="f-symbol" class="block text-xs font-semibold text-slate-600">代码</label>
+            <label for="f-symbol" class="block text-xs font-semibold text-slate-600">股票代码</label>
             <input id="f-symbol" type="text" placeholder="如：601328.SH" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
         </div>
@@ -206,27 +241,101 @@
             <input id="f-industry" type="text" placeholder="如：银行" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label for="f-tmid" class="block text-xs font-semibold text-slate-600">tmId（选填）</label>
-            <input id="f-tmid" type="text" placeholder="如：305179" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <label for="f-tmid" class="block text-xs font-semibold text-slate-600">系统编号（不知道可留空）</label>
+            <input id="f-tmid" type="text" placeholder="选填" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" id="btn-cancel-modal" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
-          <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">确认加入持仓</button>
+          <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">确认买入并自动保存</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- Sell / Realized PnL Modal -->
+  <div id="pnl-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 id="pnl-modal-title" class="text-base font-bold text-slate-900">记录本次卖出盈亏</h3>
+        <button type="button" id="btn-close-pnl" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+      </div>
+      <p id="pnl-modal-desc" class="mt-1.5 text-xs text-slate-500">填一下这笔卖出实际赚了或亏了多少钱，系统会自动更新你的胜率和盈亏比（也可以留空跳过）。</p>
+      <form id="pnl-form" class="mt-4 space-y-3">
+        <div>
+          <label for="pnl-amount-input" class="block text-xs font-semibold text-slate-600">实际盈亏金额（人民币元：赚填正数，亏填负数）</label>
+          <input id="pnl-amount-input" type="number" step="0.01" placeholder="例如赚 1200 填 1200，亏 500 填 -500（可留空）" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label for="pnl-note-input" class="block text-xs font-semibold text-slate-600">备注（选填）</label>
+          <input id="pnl-note-input" type="text" placeholder="如：右侧结束清仓 / 触发沸腾卖一半" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" id="btn-cancel-pnl" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
+          <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">确认并自动保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Record Daily Equity / NAV Modal -->
+  <div id="nav-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">记今日总资金（用于算收益率和最大回撤）</h3>
+        <button type="button" id="btn-close-nav" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+      </div>
+      <p class="mt-1.5 text-xs text-slate-500">每周或每天收盘记一次账户总资产（股票市值 + 现金），系统会自动计算累计收益率、年化收益率和最大回撤。</p>
+      <form id="nav-form" class="mt-4 space-y-3">
+        <div>
+          <label for="nav-date-input" class="block text-xs font-semibold text-slate-600">日期</label>
+          <input id="nav-date-input" type="date" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label for="nav-equity-input" class="block text-xs font-semibold text-slate-600">当日账户总资产（人民币元）</label>
+          <input id="nav-equity-input" type="number" step="0.01" min="1" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" id="btn-cancel-nav" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
+          <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700">记录并自动保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- History Modal (Closed Trades & Equity Snapshots) -->
+  <div id="history-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
+    <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">历史平仓盈亏与总资金记录</h3>
+        <button type="button" id="btn-close-history" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+      </div>
+      <div class="mt-4">
+        <h4 class="text-xs font-bold text-slate-700">已平仓盈亏记录（用于算胜率与盈亏比）</h4>
+        <div id="closed-trades-list" class="mt-2"></div>
+      </div>
+      <div class="mt-6">
+        <h4 class="text-xs font-bold text-slate-700">每日总资金记录（用于算收益率、年化与最大回撤）</h4>
+        <div id="nav-history-list" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    const CFG_KEY = "tt_board_cfg_v1";
+    const CFG_KEY = "tt_board_cfg_v2";
+    const DRAFT_KEY = "tt_board_draft_v2";
+
     let state = {
       repo: "binbin1555/trendtrader-system",
       token: "",
       remember: true,
       connected: false,
+      dirty: false,
+      saving: false,
       daily: null,
       positions: [],
+      closedTrades: [],
+      equityHistory: [],
       positionsSha: null,
       disciplineMd: "",
       totalAsset: 200000,
@@ -234,15 +343,26 @@
       activeTab: "aShare"
     };
 
-    function loadCfg() {
+    let pendingSellCtx = null;
+    let autoSaveTimer = null;
+
+    function loadLocal() {
       try {
-        const raw = localStorage.getItem(CFG_KEY);
-        if (raw) {
-          const c = JSON.parse(raw);
+        const rawCfg = localStorage.getItem(CFG_KEY);
+        if (rawCfg) {
+          const c = JSON.parse(rawCfg);
           if (c.repo) state.repo = c.repo;
           if (c.token) state.token = c.token;
           if (Number(c.totalAsset) > 0) state.totalAsset = Number(c.totalAsset);
           if (Number(c.hkdRate) > 0) state.hkdRate = Number(c.hkdRate);
+        }
+        const rawDraft = localStorage.getItem(DRAFT_KEY);
+        if (rawDraft) {
+          const d = JSON.parse(rawDraft);
+          if (Array.isArray(d.positions)) state.positions = d.positions;
+          if (Array.isArray(d.closedTrades)) state.closedTrades = d.closedTrades;
+          if (Array.isArray(d.equityHistory)) state.equityHistory = d.equityHistory;
+          if (d.dirty) state.dirty = true;
         }
       } catch (e) {}
     }
@@ -254,6 +374,17 @@
           token: state.remember ? state.token : "",
           totalAsset: state.totalAsset,
           hkdRate: state.hkdRate
+        }));
+      } catch (e) {}
+    }
+
+    function saveDraftLocal() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          positions: state.positions,
+          closedTrades: state.closedTrades,
+          equityHistory: state.equityHistory,
+          dirty: state.dirty
         }));
       } catch (e) {}
     }
@@ -284,6 +415,60 @@
       return btoa(bin);
     }
 
+    function computeMetrics(closedTrades, equityHistory) {
+      const validTrades = (closedTrades || []).filter(t => typeof t.pnl === "number" && Number.isFinite(t.pnl));
+      const wins = validTrades.filter(t => t.pnl > 0);
+      const losses = validTrades.filter(t => t.pnl < 0);
+      const winRate = validTrades.length > 0 ? (wins.length / validTrades.length) * 100 : null;
+      const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+      const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.pnl, 0) / losses.length) : 0;
+      let plRatio = null;
+      if (wins.length > 0 && losses.length > 0) plRatio = avgWin / avgLoss;
+      else if (wins.length > 0 && losses.length === 0) plRatio = Infinity;
+      else if (losses.length > 0 && wins.length === 0) plRatio = 0;
+
+      const sortedEq = [...(equityHistory || [])]
+        .filter(x => x && x.date && Number(x.equity) > 0)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      let totalReturn = null, annReturn = null, maxDrawdown = null, spanDays = 0;
+      if (sortedEq.length >= 2) {
+        const first = Number(sortedEq[0].equity);
+        const last = Number(sortedEq[sortedEq.length - 1].equity);
+        totalReturn = ((last / first) - 1) * 100;
+        const t0 = Date.parse(sortedEq[0].date);
+        const t1 = Date.parse(sortedEq[sortedEq.length - 1].date);
+        spanDays = Number.isFinite(t0) && Number.isFinite(t1) ? Math.max(0, Math.round((t1 - t0) / 86400000)) : 0;
+        if (spanDays >= 7 && first > 0 && last > 0) {
+          annReturn = (Math.pow(last / first, 365 / spanDays) - 1) * 100;
+        }
+        let peak = Number(sortedEq[0].equity);
+        let worstDd = 0;
+        sortedEq.forEach(pt => {
+          const v = Number(pt.equity);
+          if (v > peak) peak = v;
+          const dd = peak > 0 ? ((v - peak) / peak) * 100 : 0;
+          if (dd < worstDd) worstDd = dd;
+        });
+        maxDrawdown = worstDd;
+      }
+
+      return {
+        tradeCount: validTrades.length,
+        winCount: wins.length,
+        lossCount: losses.length,
+        winRate,
+        plRatio,
+        avgWin,
+        avgLoss,
+        totalReturn,
+        annReturn,
+        maxDrawdown,
+        spanDays,
+        navCount: sortedEq.length
+      };
+    }
+
     async function ghFetchFile(path) {
       const url = `https://api.github.com/repos/${state.repo}/contents/${encodeURI(path)}?t=${Date.now()}`;
       const resp = await fetch(url, {
@@ -303,7 +488,7 @@
         openConnectModal();
         return;
       }
-      showToast("正在从私有仓库同步最新数据...");
+      showToast("正在同步最新数据...");
       try {
         const [dailyRes, posRes, discRes] = await Promise.all([
           ghFetchFile("daily_reports/latest.json"),
@@ -312,37 +497,62 @@
         ]);
         state.daily = JSON.parse(dailyRes.text);
         const posObj = JSON.parse(posRes.text);
-        state.positions = Array.isArray(posObj) ? posObj : (posObj.positions || []);
+        if (!state.dirty) {
+          state.positions = Array.isArray(posObj) ? posObj : (posObj.positions || []);
+          state.closedTrades = Array.isArray(posObj.closedTrades) ? posObj.closedTrades : [];
+          state.equityHistory = Array.isArray(posObj.equityHistory) ? posObj.equityHistory : [];
+        }
         state.positionsSha = posRes.sha;
         state.disciplineMd = discRes.text || "";
         state.connected = true;
+        saveDraftLocal();
         renderAll();
-        showToast(`同步成功（数据日期：${state.daily.asOfDate}）`);
+        showToast(`已同步最新数据（${state.daily.asOfDate}）`);
+        if (state.dirty) scheduleAutoSave();
       } catch (e) {
         state.connected = false;
         renderAll();
-        showToast("同步失败：请检查私有仓库名和单仓库 Token 是否有效");
+        showToast("连接失败：请检查仓库名和专属口令是否正确（本机数据未丢失）");
       }
     }
 
-    async function pushPositionsToGitHub() {
+    function markDirtyAndAutoSave() {
+      state.dirty = true;
+      saveDraftLocal();
+      renderSyncBadges();
+      scheduleAutoSave();
+    }
+
+    function scheduleAutoSave() {
+      clearTimeout(autoSaveTimer);
       if (!state.token) {
-        openConnectModal();
+        renderSyncBadges();
         return;
       }
-      showToast("正在保存持仓到 GitHub 私有仓库...");
+      autoSaveTimer = setTimeout(() => pushToGitHub(false), 600);
+    }
+
+    async function pushToGitHub(isRetry) {
+      if (!state.token) {
+        renderSyncBadges();
+        return;
+      }
+      state.saving = true;
+      renderSyncBadges();
       try {
         let sha = state.positionsSha;
-        if (!sha) {
+        if (!sha || isRetry) {
           const cur = await ghFetchFile("positions.json").catch(() => null);
           if (cur) sha = cur.sha;
         }
         const payload = {
-          schemaVersion: "1.0",
+          schemaVersion: "2.0",
           updatedAt: new Date().toISOString(),
           asOfDate: state.daily ? state.daily.asOfDate : "",
-          note: "仅记录真实持仓与已触发减半信号历史，不含任何密钥",
-          positions: state.positions
+          note: "个人持仓、平仓盈亏与总资金净值记录（不含密钥）",
+          positions: state.positions,
+          closedTrades: state.closedTrades,
+          equityHistory: state.equityHistory
         };
         const url = `https://api.github.com/repos/${state.repo}/contents/positions.json`;
         const resp = await fetch(url, {
@@ -354,30 +564,80 @@
             "X-GitHub-Api-Version": "2022-11-28"
           },
           body: JSON.stringify({
-            message: `chore: 通过看板更新 positions.json (${state.positions.length} 只持仓)`,
+            message: `chore: 看板自动保存 (${state.positions.length}持仓 / ${state.closedTrades.length}平仓 / ${state.equityHistory.length}净值)`,
             content: utf8ToB64(JSON.stringify(payload, null, 2)),
             sha: sha || undefined
           })
         });
+        if (resp.status === 409 && !isRetry) {
+          state.saving = false;
+          return pushToGitHub(true);
+        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const res = await resp.json();
         state.positionsSha = res.content && res.content.sha ? res.content.sha : sha;
-        showToast("已成功保存并提交到你的 GitHub 私有仓库！");
+        state.dirty = false;
+        state.connected = true;
+        state.saving = false;
+        saveDraftLocal();
+        renderSyncBadges();
+        showToast("已自动保存到你的 GitHub 云端");
       } catch (e) {
-        showToast("保存失败：请先点击“拉取最新数据”或检查 Token 写权限");
+        state.saving = false;
+        renderSyncBadges();
+        showToast("云端自动保存失败，改动已暂存在本机，可稍后点顶部按钮重试");
+      }
+    }
+
+    function renderSyncBadges() {
+      const badge = document.getElementById("sync-status-badge");
+      const autoBadge = document.getElementById("autosave-badge");
+      const banner = document.getElementById("unsynced-banner");
+      const bannerMsg = document.getElementById("unsynced-msg");
+
+      if (state.connected) {
+        badge.textContent = "已连接云端";
+        badge.className = "rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700";
+      } else {
+        badge.textContent = "未连接云端";
+        badge.className = "rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700";
+      }
+
+      if (state.saving) {
+        autoBadge.textContent = "正在自动保存...";
+        autoBadge.className = "rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700";
+      } else if (state.dirty) {
+        autoBadge.textContent = "有改动待同步";
+        autoBadge.className = "rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800";
+      } else if (state.connected) {
+        autoBadge.textContent = "已自动保存 ✓";
+        autoBadge.className = "rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700";
+      } else {
+        autoBadge.textContent = "连接后开启自动保存";
+        autoBadge.className = "rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600";
+      }
+
+      if (state.dirty && !state.saving) {
+        banner.classList.remove("hidden");
+        bannerMsg.textContent = state.token
+          ? "网络或云端同步失败，你的改动已暂存在当前浏览器中。"
+          : "你尚未连接 GitHub 云端，刚才的改动暂存在当前浏览器中，连接后将自动上传。";
+      } else {
+        banner.classList.add("hidden");
       }
     }
 
     function getPendingActions() {
       const actions = [];
-      const sigLabels = { boiling: "沸腾信号", champagne: "开香槟信号", danger: "危险信号" };
+      const sigLabels = { boiling: "过热（沸）", champagne: "急涨止盈（开香槟）", danger: "回调预警（危险信号）" };
       state.positions.forEach(p => {
         if (p.isTrendRightSide === false) {
+          const overdue = p.exitAlertSince ? `（首次提醒于 ${p.exitAlertSince}）` : "";
           actions.push({
-            posId: p.id, priority: 1, type: "EXIT", badge: "清仓复核",
+            posId: p.id, priority: 1, type: "EXIT", badge: "全部卖出",
             badgeClass: "bg-rose-100 text-rose-800 border-rose-200",
             title: `${p.name} (${p.symbol})`,
-            detail: `上升右侧已结束，建议卖出全部剩余仓位（当前 ${Number(p.weight).toFixed(2)}%）。`,
+            detail: `上升趋势已结束${overdue}，按纪律卖出剩余全部仓位（当前 ${Number(p.weight).toFixed(2)}%）。`,
             done: Boolean(p.done)
           });
           return;
@@ -389,10 +649,10 @@
         if (newSigs.length > 0) {
           const afterW = (Number(p.weight) * Math.pow(0.5, newSigs.length)).toFixed(2);
           actions.push({
-            posId: p.id, priority: 2, type: "HALF", badge: "分批减半",
+            posId: p.id, priority: 2, type: "HALF", newSigs, badge: "卖出一半",
             badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
             title: `${p.name} (${p.symbol})`,
-            detail: `新触发 ${newSigs.map(s => sigLabels[s]).join(" + ")}，建议由 ${Number(p.weight).toFixed(2)}% 降至 ${afterW}%。`,
+            detail: `新触发 ${newSigs.map(s => sigLabels[s]).join(" + ")}，按纪律卖出剩余仓位的一半（从 ${Number(p.weight).toFixed(2)}% 降到 ${afterW}%）。`,
             done: Boolean(p.done)
           });
         }
@@ -401,21 +661,12 @@
     }
 
     function renderHeader() {
-      const badge = document.getElementById("sync-status-badge");
-      if (state.connected) {
-        badge.textContent = `已同步：${state.repo}`;
-        badge.className = "rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700";
-      } else {
-        badge.textContent = "未连接私有仓库（点右上角连接）";
-        badge.className = "rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700";
-      }
+      renderSyncBadges();
       document.getElementById("meta-date").textContent = state.daily ? state.daily.asOfDate : "待同步";
-      document.getElementById("discipline-version-badge").textContent = (state.daily && state.daily.disciplineVersion) || "v1.0";
-      document.getElementById("meta-cost").textContent = state.daily ? `${Number(state.daily.apiCostYuan || 0).toFixed(3)} 元` : "-";
 
       const grid = document.getElementById("market-gates-grid");
       if (!state.daily || !state.daily.gates) {
-        grid.innerHTML = `<div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">点击右上角 <strong>「连接 / 切换私有仓库」</strong> 输入你的单仓库 Token，即可在任意电脑或手机实时查看你的私有策略与最新数据。</div>`;
+        grid.innerHTML = `<div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">点击右上角 <strong>「连接我的云端数据」</strong> 输入专属口令，即可查看今日大盘冷暖、持仓提醒与战绩统计。</div>`;
         return;
       }
       const g = state.daily.gates;
@@ -428,18 +679,21 @@
         const ok = Boolean(c.obj.allowed);
         const cls = ok ? "border-emerald-200 bg-emerald-50/60" : "border-rose-200 bg-rose-50/50";
         const pill = ok ? "bg-emerald-600 text-white" : "bg-rose-600 text-white";
-        const pillTxt = ok ? "绿灯 · 允许选筹" : (c.key === "gold" ? "红灯 · 不入选" : "熔断 · 放弃选筹");
+        const pillTxt = ok ? "绿灯 · 可以选股" : (c.key === "gold" ? "观望 · 暂不买" : "红灯 · 暂停买新股");
         const extra = c.key === "gold"
-          ? `温度：${esc(c.obj.temperature)} · 右侧：${c.obj.isTrendRightSide ? "是" : "否"} · 强度：${c.obj.trendStrengthLocalCurr ?? "-"} · 持续天数：${c.obj.daysSinceTrendEntry ?? "-"}`
-          : `当前温度：${esc(c.obj.temperature)} · 右侧行业：${(c.obj.rightSideIndustries || []).length} / ${c.obj.industryCount || 51}`;
+          ? `温度：${esc(c.obj.temperature)} · 趋势：${c.obj.isTrendRightSide ? "上升趋势中" : "下跌/震荡中"}`
+          : `当前大盘温度：${esc(c.obj.temperature)}（仅“平/温/热”才买新股）`;
+        const friendlyReason = ok
+          ? (c.key === "gold" ? "处于上升趋势，已放进今日备选" : "大盘温度合适，下方已列出强势行业备选")
+          : (c.key === "gold" ? "还没走强，今天先观望" : `大盘处于「${esc(c.obj.temperature)}」，按纪律今天不买新股`);
         return `
           <div class="rounded-xl border ${cls} p-4">
             <div class="flex items-center justify-between gap-2">
-              <div class="font-bold text-slate-900">${esc(c.obj.name)} <span class="text-xs font-normal text-slate-500">#${esc(c.obj.tmId)}</span></div>
+              <div class="font-bold text-slate-900">${esc(c.obj.name)}</div>
               <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill}">${pillTxt}</span>
             </div>
             <div class="mt-2 text-xs font-medium text-slate-700">${extra}</div>
-            <div class="mt-1 text-xs text-slate-500">${esc(c.obj.reason || "")}</div>
+            <div class="mt-1 text-xs text-slate-500">${friendlyReason}</div>
           </div>
         `;
       }).join("");
@@ -449,14 +703,14 @@
       const actions = getPendingActions();
       const openCount = actions.filter(a => !a.done).length;
       const badge = document.getElementById("action-count-badge");
-      badge.textContent = `${openCount} 项待处理`;
+      badge.textContent = openCount > 0 ? `${openCount} 项待处理` : "今天无操作";
       badge.className = openCount > 0
         ? "rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700"
         : "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700";
 
       const box = document.getElementById("action-queue-container");
       if (actions.length === 0) {
-        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center text-sm text-slate-500">当前无触发清仓或分批减半的持仓动作。</div>`;
+        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center text-sm text-slate-500">当前手里没有需要清仓或卖一半的股票，安心拿着就行。</div>`;
         return;
       }
       box.innerHTML = `<div class="space-y-2.5">` + actions.map(a => `
@@ -469,14 +723,76 @@
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            ${a.type === "HALF" && !a.done ? `<button type="button" data-exec-half="${esc(a.posId)}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">确认已减半</button>` : ""}
-            ${a.type === "EXIT" && !a.done ? `<button type="button" data-exec-exit="${esc(a.posId)}" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">确认已清仓</button>` : ""}
+            ${a.type === "HALF" && !a.done ? `<button type="button" data-exec-half="${esc(a.posId)}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">我已卖出一半</button>` : ""}
+            ${a.type === "EXIT" && !a.done ? `<button type="button" data-exec-exit="${esc(a.posId)}" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">我已全部卖出</button>` : ""}
           </div>
         </div>
       `).join("") + `</div>`;
     }
 
+    function renderPerformance() {
+      const m = computeMetrics(state.closedTrades, state.equityHistory);
+      const winEl = document.getElementById("kpi-winrate");
+      const winSub = document.getElementById("kpi-winrate-sub");
+      if (m.winRate === null) {
+        winEl.textContent = "--";
+        winSub.textContent = "暂无已平仓盈亏";
+      } else {
+        winEl.textContent = `${m.winRate.toFixed(1)}%`;
+        winSub.textContent = `赚 ${m.winCount} 笔 / 亏 ${m.lossCount} 笔`;
+      }
+
+      const plEl = document.getElementById("kpi-plratio");
+      const plSub = document.getElementById("kpi-plratio-sub");
+      if (m.plRatio === null) {
+        plEl.textContent = "--";
+        plSub.textContent = "平均赚 / 平均亏";
+      } else if (m.plRatio === Infinity) {
+        plEl.textContent = "全胜";
+        plSub.textContent = `均赚 ¥${Math.round(m.avgWin).toLocaleString()}，暂无亏损`;
+      } else {
+        plEl.textContent = `${m.plRatio.toFixed(2)} : 1`;
+        plSub.textContent = `均赚 ¥${Math.round(m.avgWin).toLocaleString()} / 均亏 ¥${Math.round(m.avgLoss).toLocaleString()}`;
+      }
+
+      const retEl = document.getElementById("kpi-totalret");
+      const retSub = document.getElementById("kpi-totalret-sub");
+      if (m.totalReturn === null) {
+        retEl.textContent = "--";
+        retEl.className = "mt-1 text-lg font-bold text-slate-900";
+        retSub.textContent = m.navCount === 1 ? "已记 1 天，再记 1 天即出结果" : "点上方“+ 记今日总资金”";
+      } else {
+        retEl.textContent = `${m.totalReturn >= 0 ? "+" : ""}${m.totalReturn.toFixed(2)}%`;
+        retEl.className = `mt-1 text-lg font-bold ${m.totalReturn >= 0 ? "text-emerald-600" : "text-rose-600"}`;
+        retSub.textContent = `已记录 ${m.navCount} 个资金快照`;
+      }
+
+      const annEl = document.getElementById("kpi-annret");
+      const annSub = document.getElementById("kpi-annret-sub");
+      if (m.annReturn === null) {
+        annEl.textContent = "--";
+        annEl.className = "mt-1 text-lg font-bold text-slate-900";
+        annSub.textContent = m.navCount >= 2 ? `跨度 ${m.spanDays} 天，满 7 天后显示` : "满 7 天后自动计算";
+      } else {
+        annEl.textContent = `${m.annReturn >= 0 ? "+" : ""}${m.annReturn.toFixed(2)}%`;
+        annEl.className = `mt-1 text-lg font-bold ${m.annReturn >= 0 ? "text-emerald-600" : "text-rose-600"}`;
+        annSub.textContent = `按实际 ${m.spanDays} 天折算`;
+      }
+
+      const ddEl = document.getElementById("kpi-maxdd");
+      const ddSub = document.getElementById("kpi-maxdd-sub");
+      if (m.maxDrawdown === null) {
+        ddEl.textContent = "--";
+        ddSub.textContent = "历史高点最大跌幅";
+      } else {
+        ddEl.textContent = `${m.maxDrawdown.toFixed(2)}%`;
+        ddEl.className = `mt-1 text-lg font-bold ${m.maxDrawdown < -10 ? "text-rose-600" : "text-slate-900"}`;
+        ddSub.textContent = m.maxDrawdown === 0 ? "目前处于历史新高" : "距最高点最大回落";
+      }
+    }
+
     function renderPortfolio() {
+      renderPerformance();
       const totalAsset = Number(state.totalAsset) || 0;
       const hkdRate = Number(state.hkdRate) || 0.92;
       document.getElementById("single-cap-cny").textContent = `¥${Math.round(totalAsset * 0.05).toLocaleString()}`;
@@ -485,9 +801,14 @@
       const count = state.positions.length;
       const totalWeight = state.positions.reduce((s, p) => s + (Number(p.weight) || 0), 0);
       document.getElementById("slots-text").textContent = `${count} / 20 只`;
-      document.getElementById("slots-bar").style.width = `${Math.min(100, (count / 20) * 100)}%`;
+      const slotsBar = document.getElementById("slots-bar");
+      slotsBar.style.width = `${Math.min(100, (count / 20) * 100)}%`;
+      slotsBar.className = `h-full rounded-full transition-all ${count >= 20 ? "bg-rose-600" : "bg-slate-900"}`;
+
       document.getElementById("weight-text").textContent = `${totalWeight.toFixed(1)}% / 100%`;
-      document.getElementById("weight-bar").style.width = `${Math.min(100, totalWeight)}%`;
+      const weightBar = document.getElementById("weight-bar");
+      weightBar.style.width = `${Math.min(100, totalWeight)}%`;
+      weightBar.className = `h-full rounded-full transition-all ${totalWeight > 100 ? "bg-rose-600" : "bg-emerald-600"}`;
 
       const indCounts = {};
       state.positions.forEach(p => { const k = `${p.market}-${p.industry}`; indCounts[k] = (indCounts[k] || 0) + 1; });
@@ -495,21 +816,21 @@
       const entries = Object.entries(indCounts);
       tagsEl.innerHTML = entries.length === 0
         ? `<span class="text-xs text-slate-400">暂无持仓</span>`
-        : entries.map(([k, v]) => `<span class="rounded-md border px-2 py-0.5 text-xs ${v >= 3 ? "bg-rose-100 text-rose-800 border-rose-200 font-bold" : "bg-white text-slate-700 border-slate-200"}">${esc(k)}: ${v}/3</span>`).join("");
+        : entries.map(([k, v]) => `<span class="rounded-md border px-2 py-0.5 text-xs ${v >= 3 ? "bg-rose-100 text-rose-800 border-rose-200 font-bold" : "bg-white text-slate-700 border-slate-200"}">${esc(k)}: ${v}/3${v >= 3 ? " 已满" : ""}</span>`).join("");
 
       const box = document.getElementById("positions-container");
       if (state.positions.length === 0) {
-        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">当前无持仓记录。点击右上角「+ 记一笔买入」新增后，点顶部「保存持仓到 GitHub」即可跨设备同步。</div>`;
+        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">当前空仓。点右上角「+ 记一笔买入」后，系统会自动同步保存到你的 GitHub 云端。</div>`;
         return;
       }
       box.innerHTML = `
-        <table class="w-full min-w-[680px] border-collapse text-left text-xs">
+        <table class="w-full min-w-[660px] border-collapse text-left text-xs">
           <thead>
             <tr class="border-b border-slate-200 text-slate-500">
-              <th class="py-2 pr-3 font-semibold">标的</th>
-              <th class="py-2 pr-3 font-semibold">市场 / 行业</th>
+              <th class="py-2 pr-3 font-semibold">股票 / ETF</th>
+              <th class="py-2 pr-3 font-semibold">市场与行业</th>
               <th class="py-2 pr-3 font-semibold">当前仓位</th>
-              <th class="py-2 pr-3 font-semibold">右侧状态</th>
+              <th class="py-2 pr-3 font-semibold">趋势状态</th>
               <th class="py-2 text-right font-semibold">操作</th>
             </tr>
           </thead>
@@ -518,11 +839,11 @@
               <tr>
                 <td class="py-2.5 pr-3"><div class="font-bold text-slate-900">${esc(p.name)}</div><div class="text-slate-500">${esc(p.symbol)}</div></td>
                 <td class="py-2.5 pr-3 text-slate-700">${esc(p.market)} · ${esc(p.industry)}</td>
-                <td class="py-2.5 pr-3 font-bold ${Number(p.weight) > 5.001 ? "text-rose-600" : "text-slate-900"}">${Number(p.weight).toFixed(2)}%</td>
-                <td class="py-2.5 pr-3"><span class="rounded-full px-2 py-0.5 text-xs font-semibold ${p.isTrendRightSide ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}">${p.isTrendRightSide ? "上升右侧" : "右侧结束"}</span></td>
+                <td class="py-2.5 pr-3 font-bold ${Number(p.weight) > 5.001 ? "text-rose-600" : "text-slate-900"}">${Number(p.weight).toFixed(2)}%${Number(p.weight) > 5.001 ? ` <span class="rounded bg-rose-100 px-1 py-0.5 text-[10px] text-rose-700">超5%</span>` : ""}</td>
+                <td class="py-2.5 pr-3"><span class="rounded-full px-2 py-0.5 text-xs font-semibold ${p.isTrendRightSide ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}">${p.isTrendRightSide ? "上升趋势中" : "趋势已转弱"}</span></td>
                 <td class="py-2.5 text-right">
-                  <button type="button" data-manual-half="${esc(p.id)}" class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">减半</button>
-                  <button type="button" data-delete-pos="${esc(p.id)}" class="ml-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100">清仓</button>
+                  <button type="button" data-manual-half="${esc(p.id)}" class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">卖一半</button>
+                  <button type="button" data-delete-pos="${esc(p.id)}" class="ml-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100">全部卖出</button>
                 </td>
               </tr>
             `).join("")}
@@ -540,27 +861,26 @@
       if (state.activeTab === "discipline") {
         panel.innerHTML = state.disciplineMd
           ? `<pre class="max-h-[480px] overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-800">${esc(state.disciplineMd)}</pre>`
-          : `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">连接私有仓库后将自动展示你的 纪律.md 全文。</div>`;
+          : `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">连接云端后，这里会直接显示你的《交易纪律》全文。</div>`;
         return;
       }
       if (!state.daily || !state.daily.gates) {
-        panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">请先点击顶部「连接 / 切换私有仓库」同步最新数据。</div>`;
+        panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">请先点右上角「连接我的云端数据」加载今日行情。</div>`;
         return;
       }
       if (state.activeTab === "gold") {
         const g = state.daily.gates.gold;
-        panel.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700"><div class="text-sm font-bold text-slate-900">${esc(g.name)} (${esc(g.symbol)})</div><div class="mt-1">温度：${esc(g.temperature)} · 上升右侧：${g.isTrendRightSide ? "是" : "否"} · 本地强度：${g.trendStrengthLocalCurr ?? "-"} · 持续自然日：${g.daysSinceTrendEntry ?? "-"}</div><div class="mt-1 text-slate-500">${esc(g.reason || "")}</div></div>`;
+        panel.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700"><div class="text-sm font-bold text-slate-900">${esc(g.name)} (${esc(g.symbol)})</div><div class="mt-1">当前温度：${esc(g.temperature)} · 状态：${g.isTrendRightSide ? "上升趋势中（可买）" : "未走强（先观望）"} · 强度排名：${g.trendStrengthLocalCurr ?? "-"}</div></div>`;
         return;
       }
       const gate = state.daily.gates[state.activeTab];
       const list = (state.daily.candidates && state.daily.candidates[state.activeTab]) || [];
       if (!gate.allowed) {
-        const rsList = (gate.rightSideIndustries || []).map(i => `${esc(i.name)} (#${esc(i.tmId)})`).join("、") || "无";
-        panel.innerHTML = `<div class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-xs text-rose-900"><div class="text-sm font-bold">${esc(gate.name)}今日触发一级熔断（温度：${esc(gate.temperature)}）</div><p class="mt-1">${esc(gate.reason || "")}</p><p class="mt-2 text-slate-600">下属 ${gate.industryCount || 51} 个行业中右侧行业：${rsList}</p></div>`;
+        panel.innerHTML = `<div class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-xs text-rose-900"><div class="text-sm font-bold">${esc(gate.name)}今天暂停买新股（大盘温度：${esc(gate.temperature)}）</div><p class="mt-1">按你的纪律，只有大盘处于“平、温、热”时才挑选新股票；大盘偏冷或过热时管住手不乱买。</p></div>`;
         return;
       }
       if (list.length === 0) {
-        panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">今日无满足条件的候选标的。</div>`;
+        panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">今天没有同时满足趋势和成交额要求的备选股票。</div>`;
         return;
       }
       panel.innerHTML = `<div class="grid grid-cols-1 gap-4 md:grid-cols-2">` + list.map(grp => `
@@ -568,11 +888,44 @@
           <h3 class="mb-2 text-sm font-bold text-slate-900">${esc(grp.industryName)}</h3>
           <div class="space-y-2">${(grp.stocks || []).map(st => `
             <div class="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 text-xs">
-              <div><div class="font-bold text-slate-900">${esc(st.name)} <span class="font-normal text-slate-500">${esc(st.symbol)}</span></div><div class="text-[11px] text-slate-500">强度 ${st.strength} · 市值 ${st.marketCap}亿 · 月成交 ${st.amount1m}亿</div></div>
+              <div><div class="font-bold text-slate-900">${esc(st.name)} <span class="font-normal text-slate-500">${esc(st.symbol)}</span></div><div class="text-[11px] text-slate-500">强势分 ${st.strength} · 市值 ${st.marketCap}亿 · 月成交 ${st.amount1m}亿</div></div>
             </div>
           `).join("")}</div>
         </div>
       `).join("") + `</div>`;
+    }
+
+    function renderHistoryModal() {
+      const tBox = document.getElementById("closed-trades-list");
+      if (state.closedTrades.length === 0) {
+        tBox.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">暂无平仓记录（卖出或减半时填写盈亏即可自动累计）</div>`;
+      } else {
+        tBox.innerHTML = `<div class="space-y-1.5">` + state.closedTrades.map(t => `
+          <div class="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+            <div><span class="font-bold text-slate-800">${esc(t.name)}</span> <span class="text-slate-400">${esc(t.date)} · ${esc(t.action)}</span>${t.note ? ` <span class="text-slate-500">(${esc(t.note)})</span>` : ""}</div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold ${t.pnl >= 0 ? "text-emerald-600" : "text-rose-600"}">${t.pnl >= 0 ? "+" : ""}¥${Number(t.pnl).toLocaleString()}</span>
+              <button type="button" data-del-trade="${esc(t.id)}" class="text-[11px] text-slate-400 hover:text-rose-600">删除</button>
+            </div>
+          </div>
+        `).join("") + `</div>`;
+      }
+
+      const nBox = document.getElementById("nav-history-list");
+      const sorted = [...state.equityHistory].sort((a, b) => b.date.localeCompare(a.date));
+      if (sorted.length === 0) {
+        nBox.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">暂无总资金记录</div>`;
+      } else {
+        nBox.innerHTML = `<div class="space-y-1.5">` + sorted.map(n => `
+          <div class="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+            <span class="font-semibold text-slate-700">${esc(n.date)}</span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900">¥${Number(n.equity).toLocaleString()}</span>
+              <button type="button" data-del-nav="${esc(n.date)}" class="text-[11px] text-slate-400 hover:text-rose-600">删除</button>
+            </div>
+          </div>
+        `).join("") + `</div>`;
+      }
     }
 
     function renderAll() {
@@ -582,20 +935,32 @@
       renderCandidates();
     }
 
-    const connectModal = document.getElementById("connect-modal");
+    // Modal helpers
+    function showM(id) { const el = document.getElementById(id); el.classList.remove("hidden"); el.classList.add("flex"); }
+    function hideM(id) { const el = document.getElementById(id); el.classList.add("hidden"); el.classList.remove("flex"); }
+
     function openConnectModal() {
       document.getElementById("gh-repo-input").value = state.repo;
       document.getElementById("gh-token-input").value = state.token;
-      connectModal.classList.remove("hidden");
-      connectModal.classList.add("flex");
+      showM("connect-modal");
     }
-    function closeConnectModal() { connectModal.classList.add("hidden"); connectModal.classList.remove("flex"); }
 
+    function openSellModal(posId, mode) {
+      const p = state.positions.find(x => x.id === posId);
+      if (!p) return;
+      pendingSellCtx = { posId, mode };
+      document.getElementById("pnl-modal-title").textContent = mode === "EXIT" ? `确认全部卖出：${p.name}` : `确认卖出一半：${p.name}`;
+      document.getElementById("pnl-amount-input").value = "";
+      document.getElementById("pnl-note-input").value = mode === "EXIT" ? "趋势结束清仓" : "触发止盈/预警卖一半";
+      showM("pnl-modal");
+    }
+
+    // Event bindings
     document.getElementById("btn-open-connect").addEventListener("click", openConnectModal);
-    document.getElementById("btn-close-connect").addEventListener("click", closeConnectModal);
-    document.getElementById("btn-cancel-connect").addEventListener("click", closeConnectModal);
+    document.getElementById("btn-close-connect").addEventListener("click", () => hideM("connect-modal"));
+    document.getElementById("btn-cancel-connect").addEventListener("click", () => hideM("connect-modal"));
     document.getElementById("btn-pull-gh").addEventListener("click", pullFromGitHub);
-    document.getElementById("btn-push-pos").addEventListener("click", pushPositionsToGitHub);
+    document.getElementById("btn-retry-sync").addEventListener("click", () => state.token ? pushToGitHub(false) : openConnectModal());
 
     document.getElementById("btn-forget-token").addEventListener("click", () => {
       state.token = "";
@@ -603,7 +968,7 @@
       saveCfg();
       document.getElementById("gh-token-input").value = "";
       renderAll();
-      showToast("已清除本机保存的令牌");
+      showToast("已清除本机保存的口令");
     });
 
     document.getElementById("connect-form").addEventListener("submit", e => {
@@ -612,24 +977,23 @@
       state.token = document.getElementById("gh-token-input").value.trim();
       state.remember = document.getElementById("gh-remember-cb").checked;
       saveCfg();
-      closeConnectModal();
+      hideM("connect-modal");
       pullFromGitHub();
     });
 
-    const addModal = document.getElementById("add-modal");
-    function openAddModal() { addModal.classList.remove("hidden"); addModal.classList.add("flex"); }
-    function closeAddModal() { addModal.classList.add("hidden"); addModal.classList.remove("flex"); }
-    document.getElementById("btn-open-add-modal").addEventListener("click", openAddModal);
-    document.getElementById("btn-close-modal").addEventListener("click", closeAddModal);
-    document.getElementById("btn-cancel-modal").addEventListener("click", closeAddModal);
+    document.getElementById("btn-open-add-modal").addEventListener("click", () => showM("add-modal"));
+    document.getElementById("btn-close-modal").addEventListener("click", () => hideM("add-modal"));
+    document.getElementById("btn-cancel-modal").addEventListener("click", () => hideM("add-modal"));
 
     document.getElementById("add-pos-form").addEventListener("submit", e => {
       e.preventDefault();
-      if (state.positions.length >= 20) { showToast("已达 20 只上限"); return; }
+      if (state.positions.length >= 20) { showToast("已买满 20 只上限，请先卖出一只再买"); return; }
       const mkt = document.getElementById("f-market").value;
       const ind = document.getElementById("f-industry").value.trim();
+      const weight = Number(document.getElementById("f-weight").value);
+      if (!Number.isFinite(weight) || weight <= 0 || weight > 100) { showToast("请输入 0.1 到 100 之间的有效仓位百分比"); return; }
       if (state.positions.filter(p => p.market === mkt && p.industry === ind).length >= 3) {
-        showToast(`${mkt}-${ind} 已达单行业 3 只上限`);
+        showToast(`${mkt}-${ind} 已经买满 3 只上限了`);
         return;
       }
       state.positions.push({
@@ -639,7 +1003,7 @@
         name: document.getElementById("f-name").value.trim(),
         symbol: document.getElementById("f-symbol").value.trim(),
         industry: ind,
-        weight: Number(document.getElementById("f-weight").value) || 5.0,
+        weight: Number(weight.toFixed(2)),
         isTrendRightSide: true,
         signals: { boiling: false, champagne: false, danger: false },
         triggeredHistory: [],
@@ -647,10 +1011,80 @@
       });
       e.target.reset();
       document.getElementById("f-weight").value = "5";
-      closeAddModal();
+      hideM("add-modal");
       renderAll();
-      showToast("已加入持仓，别忘了点顶部「保存持仓到 GitHub」");
+      markDirtyAndAutoSave();
     });
+
+    document.getElementById("btn-close-pnl").addEventListener("click", () => hideM("pnl-modal"));
+    document.getElementById("btn-cancel-pnl").addEventListener("click", () => hideM("pnl-modal"));
+
+    document.getElementById("pnl-form").addEventListener("submit", e => {
+      e.preventDefault();
+      if (!pendingSellCtx) return;
+      const { posId, mode } = pendingSellCtx;
+      const p = state.positions.find(x => x.id === posId);
+      if (!p) { hideM("pnl-modal"); return; }
+      const rawPnl = document.getElementById("pnl-amount-input").value.trim();
+      const note = document.getElementById("pnl-note-input").value.trim();
+      if (rawPnl !== "" && Number.isFinite(Number(rawPnl))) {
+        state.closedTrades.unshift({
+          id: `tr-${Date.now()}`,
+          date: (state.daily && state.daily.asOfDate) || new Date().toISOString().slice(0, 10),
+          name: p.name,
+          symbol: p.symbol,
+          action: mode === "EXIT" ? "清仓" : "卖一半",
+          pnl: Number(rawPnl),
+          note
+        });
+      }
+      if (mode === "EXIT") {
+        state.positions = state.positions.filter(x => x.id !== posId);
+      } else {
+        const hist = p.triggeredHistory || [];
+        let cuts = 0;
+        ["boiling", "champagne", "danger"].forEach(k => {
+          if (p.signals && p.signals[k] && !hist.includes(k)) { hist.push(k); cuts++; }
+        });
+        p.triggeredHistory = hist;
+        p.weight = Number((Number(p.weight) * Math.pow(0.5, Math.max(1, cuts))).toFixed(2));
+        p.done = true;
+      }
+      pendingSellCtx = null;
+      hideM("pnl-modal");
+      renderAll();
+      markDirtyAndAutoSave();
+    });
+
+    document.getElementById("btn-open-nav-modal").addEventListener("click", () => {
+      document.getElementById("nav-date-input").value = (state.daily && state.daily.asOfDate) || new Date().toISOString().slice(0, 10);
+      document.getElementById("nav-equity-input").value = state.totalAsset;
+      showM("nav-modal");
+    });
+    document.getElementById("btn-close-nav").addEventListener("click", () => hideM("nav-modal"));
+    document.getElementById("btn-cancel-nav").addEventListener("click", () => hideM("nav-modal"));
+
+    document.getElementById("nav-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const dt = document.getElementById("nav-date-input").value;
+      const eq = Number(document.getElementById("nav-equity-input").value);
+      if (!dt || !Number.isFinite(eq) || eq <= 0) { showToast("请输入大于 0 的有效总资金"); return; }
+      const idx = state.equityHistory.findIndex(x => x.date === dt);
+      if (idx >= 0) state.equityHistory[idx].equity = eq;
+      else state.equityHistory.push({ date: dt, equity: eq });
+      state.totalAsset = eq;
+      document.getElementById("total-asset-input").value = eq;
+      saveCfg();
+      hideM("nav-modal");
+      renderAll();
+      markDirtyAndAutoSave();
+    });
+
+    document.getElementById("btn-open-history-modal").addEventListener("click", () => {
+      renderHistoryModal();
+      showM("history-modal");
+    });
+    document.getElementById("btn-close-history").addEventListener("click", () => hideM("history-modal"));
 
     document.getElementById("candidate-tabs").addEventListener("click", e => {
       const btn = e.target.closest(".tab-btn");
@@ -671,37 +1105,51 @@
     });
 
     document.getElementById("btn-export-pos").addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify({ updatedAt: new Date().toISOString(), positions: state.positions }, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        positions: state.positions,
+        closedTrades: state.closedTrades,
+        equityHistory: state.equityHistory
+      }, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = "positions.json";
+      a.href = url; a.download = "positions_backup.json";
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      showToast("已导出本地备份文件");
     });
 
     document.body.addEventListener("click", e => {
       const half = e.target.closest("[data-exec-half]") || e.target.closest("[data-manual-half]");
-      if (half) {
-        const id = half.dataset.execHalf || half.dataset.manualHalf;
-        const p = state.positions.find(x => x.id === id);
-        if (p) {
-          p.weight = Number((Number(p.weight) * 0.5).toFixed(2));
-          p.done = true;
-          renderAll();
-          showToast(`已减半至 ${p.weight}%，点顶部「保存持仓到 GitHub」同步`);
-        }
+      if (half) { openSellModal(half.dataset.execHalf || half.dataset.manualHalf, "HALF"); return; }
+      const del = e.target.closest("[data-exec-exit]") || e.target.closest("[data-delete-pos]");
+      if (del) { openSellModal(del.dataset.execExit || del.dataset.deletePos, "EXIT"); return; }
+
+      const delTr = e.target.closest("[data-del-trade]");
+      if (delTr) {
+        state.closedTrades = state.closedTrades.filter(t => t.id !== delTr.dataset.delTrade);
+        renderHistoryModal();
+        renderPortfolio();
+        markDirtyAndAutoSave();
         return;
       }
-      const del = e.target.closest("[data-exec-exit]") || e.target.closest("[data-delete-pos]");
-      if (del) {
-        const id = del.dataset.execExit || del.dataset.deletePos;
-        state.positions = state.positions.filter(x => x.id !== id);
-        renderAll();
-        showToast("已清仓移除，点顶部「保存持仓到 GitHub」同步");
+      const delNav = e.target.closest("[data-del-nav]");
+      if (delNav) {
+        state.equityHistory = state.equityHistory.filter(n => n.date !== delNav.dataset.delNav);
+        renderHistoryModal();
+        renderPortfolio();
+        markDirtyAndAutoSave();
       }
     });
 
-    loadCfg();
+    window.addEventListener("beforeunload", e => {
+      if (state.dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+
+    loadLocal();
     document.getElementById("total-asset-input").value = state.totalAsset;
     document.getElementById("hkd-rate-input").value = state.hkdRate;
     renderAll();
