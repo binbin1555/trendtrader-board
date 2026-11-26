@@ -157,9 +157,7 @@
           <p class="text-xs text-slate-500">已自动排除冷门小票：A股要求市值 ≥ 50亿且月成交 ≥ 10亿；港股要求市值 ≥ 50亿且月成交 ≥ 2亿港元</p>
         </div>
         <div class="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1" id="candidate-tabs">
-          <button type="button" data-tab="aShare" class="tab-btn tab-active rounded-lg px-3 py-1.5 text-xs font-semibold transition">A股备选</button>
-          <button type="button" data-tab="hkShare" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">港股备选</button>
-          <button type="button" data-tab="gold" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">黄金 (518880)</button>
+          <button type="button" data-tab="all" class="tab-btn tab-active rounded-lg px-3 py-1.5 text-xs font-semibold transition">今日全部备选</button>
           <button type="button" data-tab="discipline" class="tab-btn tab-inactive rounded-lg px-3 py-1.5 text-xs font-semibold transition">我的交易纪律</button>
         </div>
       </div>
@@ -223,6 +221,7 @@
           <div>
             <label for="f-weight" class="block text-xs font-semibold text-slate-600">买了多少仓位 (%)</label>
             <input id="f-weight" type="number" step="0.5" min="0.1" max="100" value="5" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <div id="f-weight-hint" class="mt-1 text-[11px] font-medium text-emerald-700">约 ¥10,000 / HK$10,870</div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -248,6 +247,28 @@
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" id="btn-cancel-modal" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
           <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">确认买入并自动保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Edit Weight Modal -->
+  <div id="edit-weight-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/50 p-4">
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 id="edit-weight-title" class="text-base font-bold text-slate-900">修改持仓比例</h3>
+        <button type="button" id="btn-close-edit-w" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+      </div>
+      <p class="mt-1 text-xs text-slate-500">仅修正填错的比例，不会记入卖出盈亏流水。</p>
+      <form id="edit-weight-form" class="mt-4 space-y-3">
+        <div>
+          <label for="edit-weight-input" class="block text-xs font-semibold text-slate-600">最新仓位 (%)</label>
+          <input id="edit-weight-input" type="number" step="0.1" min="0.1" max="100" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" id="btn-cancel-edit-w" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
+          <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">保存修改</button>
         </div>
       </form>
     </div>
@@ -340,10 +361,34 @@
       disciplineMd: "",
       totalAsset: 200000,
       hkdRate: 0.92,
-      activeTab: "aShare"
+      activeTab: "all"
     };
 
     let pendingSellCtx = null;
+    let pendingEditWeightId = null;
+    function updateBuyWeightHint() {
+      const w = Number(document.getElementById("f-weight").value) || 0;
+      const tot = Number(state.totalAsset) || 0;
+      const r = Number(state.hkdRate) || 0.92;
+      const cny = Math.round(tot * (w / 100));
+      const hkd = r > 0 ? Math.round(cny / r) : 0;
+      document.getElementById("f-weight-hint").textContent = `约 ¥${cny.toLocaleString()} / 约 HK$${hkd.toLocaleString()}`;
+    }
+    document.getElementById("f-weight").addEventListener("input", updateBuyWeightHint);
+    document.getElementById("btn-close-edit-w").addEventListener("click", () => hideM("edit-weight-modal"));
+    document.getElementById("btn-cancel-edit-w").addEventListener("click", () => hideM("edit-weight-modal"));
+    document.getElementById("edit-weight-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const nw = Number(document.getElementById("edit-weight-input").value);
+      if (!Number.isFinite(nw) || nw <= 0 || nw > 100) { showToast("请输入 0.1 到 100 之间的有效比例"); return; }
+      const p = state.positions.find(x => x.id === pendingEditWeightId);
+      if (p) {
+        p.weight = Number(nw.toFixed(2));
+        hideM("edit-weight-modal");
+        renderAll();
+        markDirtyAndAutoSave();
+      }
+    });
     let autoSaveTimer = null;
 
     function loadLocal() {
@@ -835,18 +880,24 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            ${state.positions.map(p => `
+            ${state.positions.map(p => {
+              const sigMap = { boiling: "沸", champagne: "香槟", danger: "危险" };
+              const hist = (p.triggeredHistory || []).map(k => sigMap[k] || k);
+              const histTag = hist.length ? `<div class="mt-0.5 text-[10px] text-amber-700">已减半：${esc(hist.join(" / "))}</div>` : "";
+              const noIdTag = !String(p.tmId || "").trim() ? `<span class="ml-1 rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500">待自动匹配编号</span>` : "";
+              return `
               <tr>
-                <td class="py-2.5 pr-3"><div class="font-bold text-slate-900">${esc(p.name)}</div><div class="text-slate-500">${esc(p.symbol)}</div></td>
+                <td class="py-2.5 pr-3"><div class="font-bold text-slate-900">${esc(p.name)}${noIdTag}</div><div class="text-slate-500">${esc(p.symbol)}</div></td>
                 <td class="py-2.5 pr-3 text-slate-700">${esc(p.market)} · ${esc(p.industry)}</td>
-                <td class="py-2.5 pr-3 font-bold ${Number(p.weight) > 5.001 ? "text-rose-600" : "text-slate-900"}">${Number(p.weight).toFixed(2)}%${Number(p.weight) > 5.001 ? ` <span class="rounded bg-rose-100 px-1 py-0.5 text-[10px] text-rose-700">超5%</span>` : ""}</td>
+                <td class="py-2.5 pr-3"><div class="font-bold ${Number(p.weight) > 5.001 ? "text-rose-600" : "text-slate-900"}">${Number(p.weight).toFixed(2)}%${Number(p.weight) > 5.001 ? ` <span class="rounded bg-rose-100 px-1 py-0.5 text-[10px] text-rose-700">超5%</span>` : ""}</div>${histTag}</td>
                 <td class="py-2.5 pr-3"><span class="rounded-full px-2 py-0.5 text-xs font-semibold ${p.isTrendRightSide ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}">${p.isTrendRightSide ? "上升趋势中" : "趋势已转弱"}</span></td>
-                <td class="py-2.5 text-right">
-                  <button type="button" data-manual-half="${esc(p.id)}" class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">卖一半</button>
+                <td class="py-2.5 text-right whitespace-nowrap">
+                  <button type="button" data-edit-weight="${esc(p.id)}" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50">改仓位</button>
+                  <button type="button" data-manual-half="${esc(p.id)}" class="ml-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">卖一半</button>
                   <button type="button" data-delete-pos="${esc(p.id)}" class="ml-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100">全部卖出</button>
                 </td>
-              </tr>
-            `).join("")}
+              </tr>`;
+            }).join("")}
           </tbody>
         </table>
       `;
@@ -868,50 +919,106 @@
         panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">请先点右上角「连接我的云端数据」加载今日行情。</div>`;
         return;
       }
-      if (state.activeTab === "gold") {
-        const g = state.daily.gates.gold;
-        panel.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700"><div class="text-sm font-bold text-slate-900">${esc(g.name)} (${esc(g.symbol)})</div><div class="mt-1">当前温度：${esc(g.temperature)} · 状态：${g.isTrendRightSide ? "上升趋势中（可买）" : "未走强（先观望）"} · 强度排名：${g.trendStrengthLocalCurr ?? "-"}</div></div>`;
-        return;
-      }
-      const gate = state.daily.gates[state.activeTab];
-      const list = (state.daily.candidates && state.daily.candidates[state.activeTab]) || [];
-      if (!gate.allowed) {
-        panel.innerHTML = `<div class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-xs text-rose-900"><div class="text-sm font-bold">${esc(gate.name)}今天暂停买新股（大盘温度：${esc(gate.temperature)}）</div><p class="mt-1">按你的纪律，只有大盘处于“平、温、热”时才挑选新股票；大盘偏冷或过热时管住手不乱买。</p></div>`;
-        return;
-      }
-      if (list.length === 0) {
-        panel.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">今天没有同时满足趋势和成交额要求的备选股票。</div>`;
-        return;
-      }
-      panel.innerHTML = `<div class="grid grid-cols-1 gap-4 md:grid-cols-2">` + list.map(grp => {
-        const sortedStocks = [...(grp.stocks || [])].sort((a, b) => Number(b.strength || 0) - Number(a.strength || 0));
-        const indStrengthTxt = grp.industryStrength !== undefined ? ` · 行业强度 ${Number(grp.industryStrength).toFixed(1)}` : "";
-        return `
-        <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <div class="mb-3 flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-            <div>
-              <h3 class="text-sm font-bold text-slate-900">${esc(grp.industryName)}</h3>
-              <div class="text-[11px] text-slate-500">右侧强势行业${indStrengthTxt}</div>
-            </div>
-            <span class="rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-semibold text-white">共 ${sortedStocks.length} 只</span>
-          </div>
-          <div class="space-y-2">${sortedStocks.map((st, idx) => `
-            <div class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs">
-              <div class="flex items-center gap-2.5">
-                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${idx === 0 ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"} text-[11px] font-bold">${idx + 1}</span>
-                <div>
-                  <div class="font-bold text-slate-900">${esc(st.name)} <span class="font-normal text-slate-500">${esc(st.symbol)}</span></div>
-                  <div class="text-[11px] text-slate-500">市值 ${st.marketCap}亿 · 月成交 ${st.amount1m}亿</div>
+
+      const heldTmIds = new Set(state.positions.map(p => String(p.tmId || "").trim()).filter(Boolean));
+      const heldSyms = new Set(state.positions.map(p => String(p.symbol || "").trim().toUpperCase()).filter(Boolean));
+      const isHeldItem = (tmId, sym) => (tmId && heldTmIds.has(String(tmId))) || (sym && heldSyms.has(String(sym).trim().toUpperCase()));
+
+      function renderMarketBlock(marketKey, mktLabel, accentBg, accentText) {
+        const gate = state.daily.gates[marketKey];
+        const list = (state.daily.candidates && state.daily.candidates[marketKey]) || [];
+        if (!gate.allowed) {
+          return `
+            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="rounded-md px-2 py-0.5 text-xs font-bold ${accentBg} ${accentText}">${mktLabel}</span>
+                  <span class="text-xs font-semibold text-slate-700">大盘温度：${esc(gate.temperature)}</span>
                 </div>
+                <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">今天暂停买新股</span>
               </div>
-              <div class="shrink-0 text-right">
-                <span class="inline-block rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">趋势强度 ${Number(st.strength).toFixed(1)}</span>
+              <p class="mt-1.5 text-xs text-slate-500">${esc(gate.reason || "按纪律仅在大盘“平/温/热”时挑选新股。")}</p>
+            </div>
+          `;
+        }
+
+        const filteredGroups = list.map(grp => {
+          const unheld = [...(grp.stocks || [])]
+            .filter(st => !isHeldItem(st.tmId, st.symbol))
+            .sort((a, b) => Number(b.strength || 0) - Number(a.strength || 0));
+          return { ...grp, stocks: unheld };
+        }).filter(grp => grp.stocks.length > 0);
+
+        const totalStocks = filteredGroups.reduce((s, g) => s + g.stocks.length, 0);
+        const bodyHtml = filteredGroups.length === 0
+          ? `<div class="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-500">当前无新的备选股票（或符合条件的均已买入）。</div>`
+          : `<div class="grid grid-cols-1 gap-3 md:grid-cols-2">` + filteredGroups.map(grp => {
+              const indStrengthTxt = grp.industryStrength !== undefined ? ` · 行业强度 ${Number(grp.industryStrength).toFixed(1)}` : "";
+              const heldInInd = state.positions.filter(p => p.market === mktLabel && p.industry === grp.industryName).length;
+              const indFull = heldInInd >= 3;
+              return `
+              <div class="rounded-xl border border-slate-200 bg-white p-3.5">
+                <div class="mb-2.5 flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-900">${esc(grp.industryName)}</h4>
+                    <div class="text-[11px] text-slate-500">右侧强势行业${indStrengthTxt} · 已持 ${heldInInd}/3</div>
+                  </div>
+                  <span class="rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-semibold text-white">共 ${grp.stocks.length} 只</span>
+                </div>
+                <div class="space-y-2">${grp.stocks.map((st, idx) => {
+                  const payload = esc(JSON.stringify({ tmId: st.tmId || "", market: mktLabel, name: st.name, symbol: st.symbol, industry: grp.industryName }));
+                  return `
+                  <div class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${idx === 0 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-700"} text-[11px] font-bold">${idx + 1}</span>
+                      <div>
+                        <div class="font-bold text-slate-900">${esc(st.name)} <span class="font-normal text-slate-500">${esc(st.symbol)}</span></div>
+                        <div class="text-[11px] text-slate-500">市值 ${st.marketCap}亿 · 月成交 ${st.amount1m}亿</div>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-1.5">
+                      <span class="inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">强度 ${Number(st.strength).toFixed(1)}</span>
+                      <button type="button" data-quick-buy="${payload}" ${indFull ? "disabled" : ""} class="rounded-md px-2.5 py-1 text-[11px] font-semibold ${indFull ? "cursor-not-allowed bg-slate-100 text-slate-400" : "bg-slate-900 text-white hover:bg-slate-800"}">${indFull ? "已满3只" : "+ 买入"}</button>
+                    </div>
+                  </div>`;
+                }).join("")}</div>
+              </div>`;
+            }).join("") + `</div>`;
+
+        return `
+          <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="rounded-md px-2.5 py-0.5 text-xs font-bold ${accentBg} ${accentText}">${mktLabel}备选</span>
+                <span class="text-xs text-slate-600">大盘温度：<strong>${esc(gate.temperature)}</strong> · 入选 ${filteredGroups.length} 个行业，共 <strong>${totalStocks}</strong> 只可买新股</span>
               </div>
             </div>
-          `).join("")}</div>
+            ${bodyHtml}
+          </div>
+        `;
+      }
+
+      // Gold 518880 block
+      const g = state.daily.gates.gold;
+      const goldHeld = isHeldItem(g.tmId || 329018, g.symbol || "518880");
+      const canBuyGold = Boolean(g.isTrendRightSide) && !goldHeld && !state.daily.candidatePoolPaused;
+      const buyGoldPayload = esc(JSON.stringify({ tmId: g.tmId || 329018, market: "黄金ETF", name: g.name || "黄金ETF华安", symbol: g.symbol || "518880", industry: "黄金" }));
+      const goldBlock = `
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border ${canBuyGold ? "border-amber-200 bg-amber-50/60" : "border-slate-200 bg-slate-50/70"} p-4 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-md bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">黄金 (518880)</span>
+            <span class="font-bold text-slate-900">${esc(g.name || "黄金ETF华安")}</span>
+            <span class="text-slate-600">${goldHeld ? "· 你已持有（已自动移出新买备选）" : (g.isTrendRightSide ? "· 处于上升趋势中（可直接买入）" : "· 暂未走强（先观望）")}</span>
+          </div>
+          ${canBuyGold ? `<button type="button" data-quick-buy="${buyGoldPayload}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">+ 买入 518880 (5%)</button>` : `<span class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">${goldHeld ? "已持有" : "暂观望"}</span>`}
         </div>
       `;
-      }).join("") + `</div>`;
+
+      panel.innerHTML = `<div class="space-y-4">`
+        + renderMarketBlock("aShare", "A股", "bg-blue-100", "text-blue-900")
+        + renderMarketBlock("hkShare", "港股", "bg-purple-100", "text-purple-900")
+        + goldBlock
+        + `</div>`;
     }
 
     function renderHistoryModal() {
@@ -1000,7 +1107,7 @@
       pullFromGitHub();
     });
 
-    document.getElementById("btn-open-add-modal").addEventListener("click", () => showM("add-modal"));
+    document.getElementById("btn-open-add-modal").addEventListener("click", () => { updateBuyWeightHint(); showM("add-modal"); });
     document.getElementById("btn-close-modal").addEventListener("click", () => hideM("add-modal"));
     document.getElementById("btn-cancel-modal").addEventListener("click", () => hideM("add-modal"));
 
@@ -1139,6 +1246,44 @@
     });
 
     document.body.addEventListener("click", e => {
+      const qbuy = e.target.closest("[data-quick-buy]");
+      if (qbuy) {
+        try {
+          const item = JSON.parse(qbuy.dataset.quickBuy);
+          if (state.positions.length >= 20) { showToast("已买满 20 只上限，请先卖出一只再买"); return; }
+          if (state.positions.filter(p => p.market === item.market && p.industry === item.industry).length >= 3) {
+            showToast(`${item.market}-${item.industry} 已经买满 3 只上限了`); return;
+          }
+          state.positions.push({
+            id: `pos-${Date.now()}`,
+            tmId: item.tmId || "",
+            market: item.market,
+            name: item.name,
+            symbol: item.symbol,
+            industry: item.industry,
+            weight: 5.0,
+            isTrendRightSide: true,
+            signals: { boiling: false, champagne: false, danger: false },
+            triggeredHistory: [],
+            done: false
+          });
+          renderAll();
+          markDirtyAndAutoSave();
+          showToast(`已一键买入 ${item.name} (5%)，已从备选池移出`);
+        } catch (err) {}
+        return;
+      }
+      const editW = e.target.closest("[data-edit-weight]");
+      if (editW) {
+        const p = state.positions.find(x => x.id === editW.dataset.editWeight);
+        if (p) {
+          pendingEditWeightId = p.id;
+          document.getElementById("edit-weight-title").textContent = `修改仓位：${p.name}`;
+          document.getElementById("edit-weight-input").value = p.weight;
+          showM("edit-weight-modal");
+        }
+        return;
+      }
       const half = e.target.closest("[data-exec-half]") || e.target.closest("[data-manual-half]");
       if (half) { openSellModal(half.dataset.execHalf || half.dataset.manualHalf, "HALF"); return; }
       const del = e.target.closest("[data-exec-exit]") || e.target.closest("[data-delete-pos]");
