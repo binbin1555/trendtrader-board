@@ -19,6 +19,9 @@
 <body class="min-h-screen antialiased">
   <div id="toast" class="fixed top-4 right-4 z-50 hidden max-w-sm rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg"></div>
 
+  <!-- Fallback / Recovery Engine Status Banner -->
+  <div id="engine-status-banner" class="hidden border-b px-4 py-3 text-center text-xs sm:text-sm font-semibold shadow-sm"></div>
+
   <!-- Unsynced Warning Banner -->
   <div id="unsynced-banner" class="hidden border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-xs font-medium text-amber-900">
     <span id="unsynced-msg">你有改动暂存在本机浏览器，尚未同步到云端。</span>
@@ -52,6 +55,9 @@
       <!-- Three-Market Weather Cards -->
       <div class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3" id="market-gates-grid"></div>
     </header>
+
+    <!-- Style Switch Reminder Banner (Read-Only, Zero Interference With Trend Data) -->
+    <section id="style-switch-card" class="hidden mb-6 rounded-2xl border p-4 sm:p-5 shadow-sm"></section>
 
     <!-- Zone 1: Today's Must-Do Actions -->
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -705,7 +711,88 @@
       return actions.sort((a, b) => a.priority - b.priority);
     }
 
+    function renderEngineBanner() {
+      const banner = document.getElementById("engine-status-banner");
+      if (!banner) return;
+      const es = state.daily && state.daily.engineStatus;
+      if (!es) { banner.classList.add("hidden"); return; }
+      if (es.mode === "fallback") {
+        banner.className = "border-b border-orange-300 bg-orange-100 px-4 py-3 text-center text-xs sm:text-sm font-semibold text-orange-950 shadow-sm";
+        banner.innerHTML = `⚠️ <strong>【备用引擎运行中】</strong> ${esc(es.message || "官方 API 异常，当前由本地备用引擎兜底。")}（自 ${esc(es.fallbackSince || "-")} 起第 ${esc(es.fallbackDays || 1)} 天）`;
+        banner.classList.remove("hidden");
+      } else if (es.justRecovered) {
+        banner.className = "border-b border-emerald-300 bg-emerald-100 px-4 py-3 text-center text-xs sm:text-sm font-semibold text-emerald-950 shadow-sm";
+        banner.innerHTML = `✅ <strong>【官方API已恢复】</strong> ${esc(es.message || "已自动切回官方数据源。")}`;
+        banner.classList.remove("hidden");
+      } else {
+        banner.classList.add("hidden");
+      }
+    }
+
+    function renderStyleSwitch() {
+      const box = document.getElementById("style-switch-card");
+      if (!box) return;
+      const sw = state.daily && state.daily.styleSwitch;
+      if (!sw || !sw.ok) {
+        box.classList.add("hidden");
+        return;
+      }
+      const isTrend = sw.mode === "trend";
+      const switched = Boolean(sw.switchedToday);
+      const wrapCls = switched
+        ? "mb-6 rounded-2xl border-2 border-indigo-400 bg-indigo-50/80 p-4 sm:p-5 shadow-sm"
+        : (isTrend
+            ? "mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5 shadow-sm"
+            : "mb-6 rounded-2xl border border-violet-200 bg-violet-50/50 p-4 sm:p-5 shadow-sm");
+      const badgeCls = isTrend ? "bg-emerald-600 text-white" : "bg-violet-600 text-white";
+      const devStr = `${Number(sw.deviationPct) >= 0 ? "+" : ""}${Number(sw.deviationPct).toFixed(2)}%`;
+      const swBadge = switched
+        ? `<span class="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white animate-pulse">今日刚触发切换</span>`
+        : "";
+      const jumpHtml = isTrend
+        ? `<span class="text-xs font-medium text-emerald-700">当前风格偏向成长趋势，可按下方趋势看板纪律执行</span>`
+        : `<span class="text-xs font-medium text-violet-800">当前风格偏向红利防守 · <a href="https://binbin1555.github.io/hongli-ma30/" target="_blank" rel="noopener" class="underline font-semibold hover:text-violet-950">打开红利 MA30 看板 →</a></span>`;
+
+      box.className = wrapCls;
+      box.innerHTML = `
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-bold text-slate-900">🧭 风格总开关</span>
+            <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeCls}">${esc(sw.modeLabel || (isTrend ? "进攻·趋势" : "防守·红利MA30"))}</span>
+            ${swBadge}
+            <span class="rounded-full bg-white/80 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500">仅作提醒 · 不干扰下方趋势数据</span>
+          </div>
+          <div class="text-xs text-slate-500">数据日：${esc(sw.asOfDate || "-")} · ${esc(sw.source || "前复权")}</div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs">
+          <div class="rounded-xl bg-white/90 border border-slate-200/80 px-3 py-2">
+            <div class="text-slate-400">300/红利比值 (RS)</div>
+            <div class="mt-0.5 font-bold text-slate-900">${esc(sw.rs)} <span class="font-medium text-slate-500">(${devStr})</span></div>
+          </div>
+          <div class="rounded-xl bg-white/90 border border-slate-200/80 px-3 py-2">
+            <div class="text-slate-400">MA120 (±1%上下轨)</div>
+            <div class="mt-0.5 font-bold text-slate-900">${esc(sw.ma120)} <span class="font-normal text-slate-500">[${esc(sw.lowerBand)}~${esc(sw.upperBand)}]</span></div>
+          </div>
+          <div class="rounded-xl bg-white/90 border border-slate-200/80 px-3 py-2">
+            <div class="text-slate-400">切换距离</div>
+            <div class="mt-0.5 font-semibold text-slate-800">${esc(sw.distText || "-")}</div>
+          </div>
+          <div class="rounded-xl bg-white/90 border border-slate-200/80 px-3 py-2">
+            <div class="text-slate-400">上次切换日</div>
+            <div class="mt-0.5 font-semibold text-slate-800">${esc(sw.lastSwitchDate || "区间内未切换")}</div>
+          </div>
+        </div>
+        <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+          ${jumpHtml}
+          <span class="text-[11px] text-slate-400">规则：510300/510880 前复权收盘比值上穿 MA120+1% 切进攻，跌破 MA120-1% 切防守</span>
+        </div>
+      `;
+      box.classList.remove("hidden");
+    }
+
     function renderHeader() {
+      renderEngineBanner();
+      renderStyleSwitch();
       renderSyncBadges();
       document.getElementById("meta-date").textContent = state.daily ? state.daily.asOfDate : "待同步";
 
